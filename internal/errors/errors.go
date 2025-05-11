@@ -12,7 +12,7 @@ type forbiddenError struct{}
 
 func (e *forbiddenError) ErrorStatusCode() int { return http.StatusForbidden }
 
-func (*forbiddenError) Error() string { return "forbidden" }
+func (*forbiddenError) Error() string { return "Forbidden" }
 
 func NewForbiddenError() ServiceError {
 	return &forbiddenError{}

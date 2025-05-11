@@ -26,11 +26,12 @@ CREATE TYPE census.gender_type AS ENUM ('male', 'female');
 -- Create tables users and user_auth in auth schema
 CREATE TABLE auth.users
 (
-    id         uuid PRIMARY KEY        DEFAULT gen_random_uuid(),
-    email      text           NOT NULL UNIQUE,
-    first_name text           NULL,
-    last_name  text           NULL,
-    role       auth.role_type NOT NULL DEFAULT 'agent'
+    id           uuid PRIMARY KEY        DEFAULT gen_random_uuid(),
+    email        text           NOT NULL UNIQUE,
+    first_name   text           NOT NULL DEFAULT '',
+    last_name    text           NOT NULL DEFAULT '',
+    role         auth.role_type NOT NULL DEFAULT 'agent',
+    default_user boolean                 DEFAULT false
 ) INHERITS (public.auditable);
 
 CREATE TRIGGER update_users_updated_at
@@ -41,7 +42,7 @@ EXECUTE FUNCTION update_at();
 
 CREATE TABLE auth.user_auth
 (
-    id                   uuid PRIMARY KEY REFERENCES auth.users (id) ON DELETE CASCADE,
+    user_id              uuid PRIMARY KEY REFERENCES auth.users (id) ON DELETE CASCADE,
     password             text                     NOT NULL, -- Encrypted password (bcrypt)
     last_login           timestamp with time zone NOT NULL DEFAULT now(),
     last_password_change timestamp with time zone NOT NULL DEFAULT now()

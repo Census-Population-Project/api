@@ -1,6 +1,9 @@
 package config
 
 import (
+	"crypto/ed25519"
+	"crypto/x509"
+	"encoding/pem"
 	"fmt"
 	"log"
 	"os"
@@ -9,9 +12,11 @@ import (
 )
 
 type Config struct {
-	DevMode bool
-	ApiPath string
-	Server  struct {
+	DevMode             bool
+	DefaultUserEmail    string
+	DefaultUserPassword string
+	ApiPath             string
+	Server              struct {
 		Host         string
 		Port         int
 		AllowOrigins []string
@@ -31,6 +36,12 @@ type Config struct {
 		Password string
 		DB       int
 	}
+	Secure struct {
+		PrivateKeyFile string
+		PrivateKey     ed25519.PrivateKey
+		PublicKeyFile  string
+		PublicKey      ed25519.PublicKey
+	}
 	Version string
 }
 
@@ -43,6 +54,9 @@ func LoadConfig() (*Config, error) {
 	}
 
 	cfg.DevMode = os.Getenv("DEV_MODE") == "true"
+
+	cfg.DefaultUserEmail = os.Getenv("DEFAULT_USER_EMAIL")
+	cfg.DefaultUserPassword = os.Getenv("DEFAULT_USER_PASSWORD")
 
 	cfg.ApiPath = os.Getenv("API_PATH")
 
@@ -96,6 +110,36 @@ func LoadConfig() (*Config, error) {
 		return nil, err
 	}
 	cfg.Redis.Password = os.Getenv("REDIS_PASSWORD")
+
+	cfg.Secure.PrivateKeyFile = os.Getenv("PRIVATE_KEY_FILE")
+	if cfg.Secure.PrivateKeyFile == "" {
+		return nil, fmt.Errorf("private key file not set")
+	}
+	privateKeyBytes, err := os.ReadFile(cfg.Secure.PrivateKeyFile)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read private key file: %w", err)
+	}
+	block, _ := pem.Decode(privateKeyBytes)
+	privateKey, err := x509.ParsePKCS8PrivateKey(block.Bytes)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse private key: %w", err)
+	}
+	cfg.Secure.PrivateKey = privateKey.(ed25519.PrivateKey)
+
+	cfg.Secure.PublicKeyFile = os.Getenv("PUBLIC_KEY_FILE")
+	if cfg.Secure.PublicKeyFile == "" {
+		return nil, fmt.Errorf("public key file not set")
+	}
+	publicKeyBytes, err := os.ReadFile(cfg.Secure.PublicKeyFile)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read public key file: %w", err)
+	}
+	block, _ = pem.Decode(publicKeyBytes)
+	publicKey, err := x509.ParsePKIXPublicKey(block.Bytes)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse public key: %w", err)
+	}
+	cfg.Secure.PublicKey = publicKey.(ed25519.PublicKey)
 
 	return cfg, nil
 }

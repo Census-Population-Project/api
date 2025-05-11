@@ -41,6 +41,12 @@ func main() {
 	log.Info("Connected to database!")
 
 	server := api.NewServerHttp(log, cfg, db, rdb, &wg)
+
+	err = server.UsersService.InitDefaultUser()
+	if err != nil {
+		log.Fatalf("Failed to initialize default user: %v", err)
+	}
+
 	server.InitAPI()
 	server.Start()
 
