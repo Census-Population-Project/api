@@ -43,7 +43,7 @@ func AuthorizationMiddleware() func(http.Handler) http.Handler {
 			}
 
 			tokenStr := strings.TrimPrefix(authHeader, "Bearer ")
-			access, claims, err := authService.ValidateUserToken(tokenStr)
+			access, claims, err := authService.ValidateUserToken(tokenStr, "access")
 			if err != nil {
 				var srvErr serviceerrors.ServiceError
 				if errors.As(err, &srvErr) {
@@ -61,6 +61,7 @@ func AuthorizationMiddleware() func(http.Handler) http.Handler {
 			}
 
 			r = r.WithContext(context.WithValue(r.Context(), "claims", claims))
+			r = r.WithContext(context.WithValue(r.Context(), "accessToken", tokenStr))
 
 			next.ServeHTTP(w, r)
 		})

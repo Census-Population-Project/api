@@ -121,17 +121,107 @@ func (s *Service) LoginUser(email, password string) (*Tokens, error) {
 	}, nil
 }
 
-func (s *Service) RefreshToken(refreshToken string) (*Tokens, error) { // TODO: Implement
-	return nil, nil
+func (s *Service) RefreshToken(refreshToken string) (*Tokens, error) {
+	ok, claims, err := s.ValidateUserToken(refreshToken, "refresh")
+	if err != nil {
+		return nil, err
+	}
+	if !ok {
+		return nil, NewInvalidOrExpiredTokenError()
+	}
+
+	accessJti := uuid.New()
+	refreshJti := uuid.New()
+
+	exists, err := s.RDB.Exists(context.Background(), fmt.Sprintf("blacklisted:%s", (*claims)["jti"].(string))).Result()
+	if err != nil {
+		return nil, err
+	}
+	if exists > 0 {
+		return nil, NewInvalidOrExpiredTokenError()
+	}
+
+	userIdStr, ok := (*claims)["sub"].(string)
+	if !ok {
+		return nil, NewInvalidOrExpiredTokenError()
+	}
+	userId, err := uuid.Parse(userIdStr)
+	if err != nil {
+		return nil, NewInvalidOrExpiredTokenError()
+	}
+
+	user, err := s.CRUDUsers.SelectUserByID(userId)
+	if err != nil {
+		return nil, err
+	}
+
+	newAccessToken, err := s.GenerationAccessToken(user.ID, user.Role, accessJti, refreshJti)
+	if err != nil {
+		return nil, err
+	}
+
+	newRefreshToken, err := s.GenerationRefreshToken(user.ID, accessJti, refreshJti)
+	if err != nil {
+		return nil, err
+	}
+
+	newAccessTokenKey := fmt.Sprintf("access_token:%s:%s", user.ID.String(), accessJti.String())
+	newRefreshTokenKey := fmt.Sprintf("refresh_token:%s:%s", user.ID.String(), refreshJti.String())
+
+	oldAccessTokenKey := fmt.Sprintf("access_token:%s:%s", user.ID.String(), (*claims)["access_jti"].(string))
+	oldRefreshTokenKey := fmt.Sprintf("refresh_token:%s:%s", user.ID.String(), (*claims)["jti"].(string))
+
+	blacklistedAccessKey := fmt.Sprintf("blacklisted:%s", (*claims)["access_jti"].(string))
+	blacklistedRefreshKey := fmt.Sprintf("blacklisted:%s", (*claims)["jti"].(string))
+
+	rdbPipeline := s.RDB.Pipeline()
+	rdbPipeline.Set(context.Background(), newAccessTokenKey, newAccessToken, 30*time.Minute)
+	rdbPipeline.Set(context.Background(), newRefreshTokenKey, newRefreshToken, 7*24*time.Hour)
+	rdbPipeline.Del(context.Background(), oldAccessTokenKey)
+	rdbPipeline.Del(context.Background(), oldRefreshTokenKey)
+	rdbPipeline.Set(context.Background(), blacklistedAccessKey, true, 60*time.Minute)
+	rdbPipeline.Set(context.Background(), blacklistedRefreshKey, true, 8*24*time.Hour)
+	_, err = rdbPipeline.Exec(context.Background())
+	if err != nil {
+		return nil, err
+	}
+
+	go func() {
+		_ = s.CRUDUsers.UpdateLastLoginByID(user.ID)
+	}()
+
+	return &Tokens{
+		AccessToken:  newAccessToken,
+		RefreshToken: newRefreshToken,
+	}, nil
 }
 
-func (s *Service) LogoutUser(refreshToken string) error { // TODO: Implement
+func (s *Service) LogoutUser(accessTokenClaims *jwt.MapClaims) error {
+	accessJti := (*accessTokenClaims)["jti"].(string)
+	refreshJti := (*accessTokenClaims)["refresh_jti"].(string)
+	userId := (*accessTokenClaims)["sub"].(string)
+
+	accessTokenKey := fmt.Sprintf("access_token:%s:%s", userId, accessJti)
+	refreshTokenKey := fmt.Sprintf("refresh_token:%s:%s", userId, refreshJti)
+	blacklistedAccessKey := fmt.Sprintf("blacklisted:%s", accessJti)
+	blacklistedRefreshKey := fmt.Sprintf("blacklisted:%s", refreshJti)
+
+	rdbPipeline := s.RDB.Pipeline()
+	rdbPipeline.Del(context.Background(), accessTokenKey)
+	rdbPipeline.Del(context.Background(), refreshTokenKey)
+	rdbPipeline.Set(context.Background(), blacklistedAccessKey, true, 60*time.Minute)
+	rdbPipeline.Set(context.Background(), blacklistedRefreshKey, true, 8*24*time.Hour)
+	_, err := rdbPipeline.Exec(context.Background())
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
-func (s *Service) ValidateUserToken(accessToken string) (bool, *jwt.MapClaims, error) {
+func (s *Service) ValidateUserToken(token string, tokenType string) (bool, *jwt.MapClaims, error) {
 	if s.Config.Secure.PublicKey != nil {
-		token, err := jwt.Parse(accessToken, func(token *jwt.Token) (interface{}, error) {
+		token, err := jwt.Parse(token, func(token *jwt.Token) (interface{}, error) {
 			return s.Config.Secure.PublicKey, nil
 		})
 
@@ -144,7 +234,7 @@ func (s *Service) ValidateUserToken(accessToken string) (bool, *jwt.MapClaims, e
 			return false, nil, NewInvalidOrExpiredTokenError()
 		}
 
-		if !s.IsAvailableToken(&claims) {
+		if !s.IsAvailableToken(tokenType, &claims) {
 			return false, nil, NewInvalidOrExpiredTokenError()
 		}
 
@@ -153,7 +243,7 @@ func (s *Service) ValidateUserToken(accessToken string) (bool, *jwt.MapClaims, e
 	return false, nil, nil
 }
 
-func (s *Service) IsAvailableToken(claims *jwt.MapClaims) bool {
+func (s *Service) IsAvailableToken(tokenType string, claims *jwt.MapClaims) bool {
 	jtiVal, ok := (*claims)["jti"]
 	if !ok {
 		return false
@@ -172,7 +262,16 @@ func (s *Service) IsAvailableToken(claims *jwt.MapClaims) bool {
 		return false
 	}
 
-	_, err := s.RDB.Get(context.Background(), fmt.Sprintf("access_token:%s:%s", userId, jti)).Result()
+	var tokenKey string
+	switch tokenType {
+	case "access":
+		tokenKey = fmt.Sprintf("access_token:%s:%s", userId, jti)
+	case "refresh":
+		tokenKey = fmt.Sprintf("refresh_token:%s:%s", userId, jti)
+	default:
+		return false
+	}
+	_, err := s.RDB.Get(context.Background(), tokenKey).Result()
 	if err != nil {
 		return false
 	}

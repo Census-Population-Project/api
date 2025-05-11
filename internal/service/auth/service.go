@@ -12,8 +12,8 @@ type ServiceInterface interface {
 
 	LoginUser(email, password string) (*Tokens, error)
 	RefreshToken(refreshToken string) (*Tokens, error)
-	LogoutUser(refreshToken string) error
+	LogoutUser(accessTokenClaims *jwt.MapClaims) error
 
-	ValidateUserToken(accessToken string) (bool, *jwt.MapClaims, error)
-	IsAvailableToken(claims *jwt.MapClaims) bool
+	ValidateUserToken(accessToken string, tokenType string) (bool, *jwt.MapClaims, error)
+	IsAvailableToken(tokenType string, claims *jwt.MapClaims) bool
 }
