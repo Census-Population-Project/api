@@ -98,7 +98,7 @@ func (s *CRUDUsers) SelectUsers(limit, offset int) ([]User, error) {
 
 	users, err := pgx.CollectRows(rows, pgx.RowToStructByName[User])
 	if err != nil {
-		s.Logger.Error("Failed to get users: ", err)
+		s.Logger.Error("Failed to collect users: ", err)
 		return nil, err
 	}
 
@@ -121,7 +121,7 @@ func (s *CRUDUsers) SelectUserByEmail(email string) (*User, error) {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, NewUserNotFoundError()
 		}
-		s.Logger.Error("Failed to get user by email: ", err)
+		s.Logger.Error("Failed to collect user by email: ", err)
 		return nil, err
 	}
 
@@ -144,7 +144,7 @@ func (s *CRUDUsers) SelectUserByID(id uuid.UUID) (*User, error) {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, NewUserNotFoundError()
 		}
-		s.Logger.Error("Failed to get user by ID: ", err)
+		s.Logger.Error("Failed to collect user by ID: ", err)
 		return nil, err
 	}
 
@@ -168,7 +168,7 @@ func (s *CRUDUsers) SelectUserAuthByEmail(email string) (*UserAuth, error) {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, NewUserNotFoundError()
 		}
-		s.Logger.Error("Failed to get user auth by email: ", err)
+		s.Logger.Error("Failed to collect user auth by email: ", err)
 		return nil, err
 	}
 
@@ -191,7 +191,7 @@ func (s *CRUDUsers) SelectDefaultUser() (*User, error) {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, NewUserNotFoundError()
 		}
-		s.Logger.Error("Failed to get default user: ", err)
+		s.Logger.Error("Failed to collect default user: ", err)
 		return nil, err
 	}
 

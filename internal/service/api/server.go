@@ -10,12 +10,16 @@ import (
 	"github.com/Census-Population-Project/API/internal/service/api/middleware"
 
 	authservice "github.com/Census-Population-Project/API/internal/service/auth"
+	geoservice "github.com/Census-Population-Project/API/internal/service/geo"
 	usersservice "github.com/Census-Population-Project/API/internal/service/users"
 
 	authhandlers "github.com/Census-Population-Project/API/internal/service/api/handlers/auth"
+	geohandlers "github.com/Census-Population-Project/API/internal/service/api/handlers/geo"
 	systemhandlers "github.com/Census-Population-Project/API/internal/service/api/handlers/system"
 	usershandlers "github.com/Census-Population-Project/API/internal/service/api/handlers/users"
 
+	"github.com/ekomobile/dadata/v2"
+	"github.com/ekomobile/dadata/v2/client"
 	"github.com/go-chi/chi/v5"
 	chimiddleware "github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/cors"
@@ -49,6 +53,7 @@ type Server struct {
 
 	AuthService  *authservice.Service
 	UsersService *usersservice.Service
+	GeoService   *geoservice.Service
 }
 
 func (s *Server) InitAPI() {
@@ -66,12 +71,14 @@ func (s *Server) InitAPI() {
 
 	authHandlers := authhandlers.NewAuthHandler(s.Config, s.AuthService)
 	usersHandlers := usershandlers.NewUsersHandler(s.Config, s.UsersService)
+	geoHandlers := geohandlers.NewGeoHandler(s.Config, s.GeoService)
 
 	systemHandlers := systemhandlers.NewSystemHandler(s.Config)
 
 	r.Route("/api/v1", func(r chi.Router) {
 		r.Mount("/auth", authHandlers.Router)
 		r.Mount("/users", usersHandlers.Router)
+		r.Mount("/geo", geoHandlers.Router)
 
 		r.Mount("/system", systemHandlers.Router)
 	})
@@ -96,8 +103,15 @@ func (s *Server) Start() {
 
 func NewServerHttp(
 	log *logrus.Logger, cfg *config.Config,
-	db *database.DataBase, rdb *redis.Client, wg *sync.WaitGroup,
+	db *database.DataBase, rdb *redis.Client,
+	wg *sync.WaitGroup,
 ) *Server {
+	ddsCredentials := client.Credentials{
+		ApiKeyValue:    cfg.DaDataApiKey,
+		SecretKeyValue: cfg.DaDataApiSecret,
+	}
+	ddsApi := dadata.NewSuggestApi(client.WithCredentialProvider(&ddsCredentials))
+
 	return &Server{
 		WaitGroup: wg,
 		Engine: &ServerEngine{
@@ -114,5 +128,6 @@ func NewServerHttp(
 
 		AuthService:  authservice.NewService(cfg, db, rdb, log),
 		UsersService: usersservice.NewService(cfg, db, log),
+		GeoService:   geoservice.NewService(cfg, db, log, ddsApi),
 	}
 }

@@ -23,6 +23,7 @@ CREATE SCHEMA "census";
 CREATE TYPE auth.role_type AS ENUM ('agent', 'administrator');
 CREATE TYPE census.gender_type AS ENUM ('male', 'female');
 
+
 -- Create tables users and user_auth in auth schema
 CREATE TABLE auth.users
 (
@@ -86,7 +87,7 @@ CREATE TABLE geo.buildings
     id           uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     city_id      uuid NOT NULL REFERENCES geo.cities (id) ON DELETE CASCADE,
     street       text NOT NULL,
-    house_number text             DEFAULT NULL
+    house_number text NOT NULL UNIQUE
 ) INHERITS (public.auditable);
 
 CREATE TRIGGER update_buildings_updated_at
@@ -107,6 +108,7 @@ CREATE TRIGGER update_addresses_updated_at
     ON geo.addresses
     FOR EACH ROW
 EXECUTE FUNCTION update_at();
+
 
 -- Create table census in census schema
 CREATE TABLE census.households

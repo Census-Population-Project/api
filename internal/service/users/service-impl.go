@@ -76,12 +76,7 @@ func (s *Service) CreateUser(email, password, firstName, lastName, role string, 
 }
 
 func (s *Service) GetUsers(limit, offset int) ([]User, error) {
-	users, err := s.CRUDUsers.SelectUsers(limit, offset)
-	if err != nil {
-		return nil, err
-	}
-
-	return users, nil
+	return s.CRUDUsers.SelectUsers(limit, offset)
 }
 
 func (s *Service) GetUserByID(id uuid.UUID) (*User, error) {

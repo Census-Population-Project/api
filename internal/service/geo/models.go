@@ -25,3 +25,16 @@ type Address struct {
 	BuildingID      uuid.UUID `json:"building_id"`
 	ApartmentNumber string    `json:"apartment_number"`
 }
+
+type FullAddress struct {
+	RegionID        uuid.UUID `json:"region_id"`
+	Region          string    `json:"region"`
+	CityID          uuid.UUID `json:"city_id"`
+	City            string    `json:"city"`
+	BuildingID      uuid.UUID `json:"building_id"`
+	Street          string    `json:"street"`
+	HouseNumber     string    `json:"house_number"`
+	AddressID       uuid.UUID `json:"address_id"`
+	ApartmentNumber string    `json:"apartment_number"`
+	FullAddress     string    `json:"full_address"`
+}

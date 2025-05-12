@@ -12,15 +12,21 @@ import (
 )
 
 type Config struct {
-	DevMode             bool
+	DevMode bool
+
+	DaDataApiKey        string
+	DaDataApiSecret     string
 	DefaultUserEmail    string
 	DefaultUserPassword string
-	ApiPath             string
-	Server              struct {
+
+	ApiPath string
+
+	Server struct {
 		Host         string
 		Port         int
 		AllowOrigins []string
 	}
+
 	Database struct {
 		Name           string
 		Username       string
@@ -30,18 +36,21 @@ type Config struct {
 		SSLMode        bool
 		MaxConnections int
 	}
+
 	Redis struct {
 		Host     string
 		Port     int
 		Password string
 		DB       int
 	}
+
 	Secure struct {
 		PrivateKeyFile string
 		PrivateKey     ed25519.PrivateKey
 		PublicKeyFile  string
 		PublicKey      ed25519.PublicKey
 	}
+
 	Version string
 }
 
@@ -55,6 +64,14 @@ func LoadConfig() (*Config, error) {
 
 	cfg.DevMode = os.Getenv("DEV_MODE") == "true"
 
+	cfg.DaDataApiKey = os.Getenv("DADATA_API_KEY")
+	if cfg.DaDataApiKey == "" {
+		return nil, fmt.Errorf("DADATA_API_KEY is not set")
+	}
+	cfg.DaDataApiSecret = os.Getenv("DADATA_API_SECRET")
+	if cfg.DaDataApiSecret == "" {
+		return nil, fmt.Errorf("DADATA_API_SECRET is not set")
+	}
 	cfg.DefaultUserEmail = os.Getenv("DEFAULT_USER_EMAIL")
 	cfg.DefaultUserPassword = os.Getenv("DEFAULT_USER_PASSWORD")
 
