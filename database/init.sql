@@ -70,9 +70,9 @@ EXECUTE FUNCTION update_at();
 
 CREATE TABLE geo.cities
 (
-    id     uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-    region uuid NOT NULL REFERENCES geo.regions (id) ON DELETE CASCADE,
-    name   text NOT NULL UNIQUE
+    id        uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    region_id uuid NOT NULL REFERENCES geo.regions (id) ON DELETE CASCADE,
+    name      text NOT NULL UNIQUE
 ) INHERITS (public.auditable);
 
 CREATE TRIGGER update_cities_updated_at
@@ -84,7 +84,6 @@ EXECUTE FUNCTION update_at();
 CREATE TABLE geo.buildings
 (
     id           uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-    region_id    uuid NOT NULL REFERENCES geo.regions (id) ON DELETE CASCADE,
     city_id      uuid NOT NULL REFERENCES geo.cities (id) ON DELETE CASCADE,
     street       text NOT NULL,
     house_number text             DEFAULT NULL
@@ -144,7 +143,7 @@ CREATE TABLE census.persons
     nationality           text,
     native_language       text,
     speaks_russian        boolean,
-    other_languages       text[], -- список языков
+    other_languages       text[], -- Languages spoken by the person
 
     education_level       text,
     marital_status        text,
