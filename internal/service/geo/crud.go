@@ -27,6 +27,11 @@ type CRUDInterface interface {
 	InsertFullAddress(regionName, cityName, street, houseNumber, apartmentNumber string) (*FullAddress, error)
 }
 
+type CRUDGeo struct {
+	DataBase *database.DataBase
+	Logger   *logrus.Logger
+}
+
 func (s *CRUDGeo) SelectRegions(limit, offset int) ([]Region, error) {
 	query := `SELECT * FROM geo.regions ORDER BY created_at DESC LIMIT $1 OFFSET $2`
 	rows, err := s.DataBase.DBPool.Query(context.Background(), query, limit, offset)
@@ -259,11 +264,6 @@ func (s *CRUDGeo) InsertFullAddress(regionName, cityName, street, houseNumber, a
 		ApartmentNumber: address.ApartmentNumber,
 		FullAddress:     fullAddress,
 	}, nil
-}
-
-type CRUDGeo struct {
-	DataBase *database.DataBase
-	Logger   *logrus.Logger
 }
 
 func NewGeoCRUD(db *database.DataBase, log *logrus.Logger) *CRUDGeo {
