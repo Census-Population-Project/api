@@ -10,10 +10,12 @@ import (
 	"github.com/Census-Population-Project/API/internal/service/api/middleware"
 
 	authservice "github.com/Census-Population-Project/API/internal/service/auth"
+	censusservice "github.com/Census-Population-Project/API/internal/service/census"
 	geoservice "github.com/Census-Population-Project/API/internal/service/geo"
 	usersservice "github.com/Census-Population-Project/API/internal/service/users"
 
 	authhandlers "github.com/Census-Population-Project/API/internal/service/api/handlers/auth"
+	censushandlers "github.com/Census-Population-Project/API/internal/service/api/handlers/census"
 	geohandlers "github.com/Census-Population-Project/API/internal/service/api/handlers/geo"
 	systemhandlers "github.com/Census-Population-Project/API/internal/service/api/handlers/system"
 	usershandlers "github.com/Census-Population-Project/API/internal/service/api/handlers/users"
@@ -51,9 +53,10 @@ type Server struct {
 	Database  *database.DataBase
 	Redis     *redis.Client
 
-	AuthService  *authservice.Service
-	UsersService *usersservice.Service
-	GeoService   *geoservice.Service
+	AuthService   *authservice.Service
+	UsersService  *usersservice.Service
+	GeoService    *geoservice.Service
+	CensusService *censusservice.Service
 }
 
 func (s *Server) InitAPI() {
@@ -72,6 +75,7 @@ func (s *Server) InitAPI() {
 	authHandlers := authhandlers.NewAuthHandler(s.Config, s.AuthService)
 	usersHandlers := usershandlers.NewUsersHandler(s.Config, s.UsersService)
 	geoHandlers := geohandlers.NewGeoHandler(s.Config, s.GeoService)
+	censusHandlers := censushandlers.NewCensusHandler(s.Config, s.CensusService, s.GeoService)
 
 	systemHandlers := systemhandlers.NewSystemHandler(s.Config)
 
@@ -79,6 +83,7 @@ func (s *Server) InitAPI() {
 		r.Mount("/auth", authHandlers.Router)
 		r.Mount("/users", usersHandlers.Router)
 		r.Mount("/geo", geoHandlers.Router)
+		r.Mount("/census", censusHandlers.Router)
 
 		r.Mount("/system", systemHandlers.Router)
 	})
@@ -126,8 +131,9 @@ func NewServerHttp(
 		Database: db,
 		Redis:    rdb,
 
-		AuthService:  authservice.NewService(cfg, db, rdb, log),
-		UsersService: usersservice.NewService(cfg, db, log),
-		GeoService:   geoservice.NewService(cfg, db, log, ddsApi),
+		AuthService:   authservice.NewService(cfg, db, rdb, log),
+		UsersService:  usersservice.NewService(cfg, db, log),
+		GeoService:    geoservice.NewService(cfg, db, log, ddsApi),
+		CensusService: censusservice.NewService(cfg, db, log, ddsApi),
 	}
 }

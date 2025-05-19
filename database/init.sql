@@ -60,7 +60,9 @@ EXECUTE FUNCTION update_at();
 CREATE TABLE geo.regions
 (
     id   uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-    name text NOT NULL UNIQUE
+    name text             NOT NULL UNIQUE,
+    lat  double PRECISION NOT NULL,
+    lon  double PRECISION NOT NULL
 ) INHERITS (public.auditable);
 
 CREATE TRIGGER update_regions_updated_at
@@ -72,8 +74,10 @@ EXECUTE FUNCTION update_at();
 CREATE TABLE geo.cities
 (
     id        uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-    region_id uuid NOT NULL REFERENCES geo.regions (id) ON DELETE CASCADE,
-    name      text NOT NULL UNIQUE
+    region_id uuid             NOT NULL REFERENCES geo.regions (id) ON DELETE CASCADE,
+    name      text             NOT NULL UNIQUE,
+    lat       double PRECISION NOT NULL,
+    lon       double PRECISION NOT NULL
 ) INHERITS (public.auditable);
 
 CREATE TRIGGER update_cities_updated_at
@@ -85,9 +89,12 @@ EXECUTE FUNCTION update_at();
 CREATE TABLE geo.buildings
 (
     id           uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-    city_id      uuid NOT NULL REFERENCES geo.cities (id) ON DELETE CASCADE,
-    street       text NOT NULL,
-    house_number text NOT NULL UNIQUE
+    city_id      uuid             NOT NULL REFERENCES geo.cities (id) ON DELETE CASCADE,
+    street       text             NOT NULL,
+    additional   text             DEFAULT NULL,
+    house_number text             NOT NULL,
+    lat          double PRECISION NOT NULL,
+    lon          double PRECISION NOT NULL
 ) INHERITS (public.auditable);
 
 CREATE TRIGGER update_buildings_updated_at
@@ -111,11 +118,26 @@ EXECUTE FUNCTION update_at();
 
 
 -- Create table census in census schema
+CREATE TABLE census.events
+(
+    id             uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    name           text      NOT NULL UNIQUE,
+    start_datetime timestamp NOT NULL,
+    end_datetime   timestamp NOT NULL
+) INHERITS (public.auditable);
+
+CREATE TRIGGER update_events_updated_at
+    BEFORE UPDATE
+    ON census.events
+    FOR EACH ROW
+EXECUTE FUNCTION update_at();
+
 CREATE TABLE census.households
 (
     id              uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-    address_id      uuid    NOT NULL REFERENCES geo.addresses (id) ON DELETE CASCADE,
-    enumerator_id   uuid    NOT NULL REFERENCES auth.users (id),
+    address_id      uuid    REFERENCES geo.addresses (id) ON DELETE SET NULL,
+    enumerator_id   uuid    REFERENCES auth.users (id) ON DELETE SET NULL,
+    event_id        uuid    REFERENCES census.events (id) ON DELETE SET NULL,
 
     total_residents integer NOT NULL, -- Total number of residents in the household
     dwelling_type   text,             -- Type of dwelling (e.g., apartment, house)
@@ -135,11 +157,11 @@ EXECUTE FUNCTION update_at();
 
 CREATE TABLE census.persons
 (
-    id                    uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-    household_id          uuid               NOT NULL REFERENCES census.households (id) ON DELETE CASCADE,
+    id                    uuid PRIMARY KEY   DEFAULT gen_random_uuid(),
+    household_id          uuid NOT NULL REFERENCES census.households (id) ON DELETE CASCADE,
 
-    gender                census.gender_type NOT NULL,
-    birth_date            date               NOT NULL,
+    gender                census.gender_type DEFAULT NULL,
+    birth_date            date NOT NULL,
     citizenship           text,
     has_dual_citizenship  boolean,
     nationality           text,

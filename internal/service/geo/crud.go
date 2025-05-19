@@ -24,7 +24,12 @@ type CRUDInterface interface {
 	InsertBuilding(cityId uuid.UUID, street, houseNumber string) (*uuid.UUID, error) // TODO: Implement this in the future.
 	SelectAddressesInBuilding(buildingId uuid.UUID, limit, offset int) ([]Address, error)
 
-	InsertFullAddress(regionName, cityName, street, houseNumber, apartmentNumber string) (*FullAddress, error)
+	InsertFullAddress(
+		regionName string, regionLat float64, regionLon float64,
+		cityName string, cityLat float64, cityLon float64,
+		street string, additional *string, streetLat float64, streetLon float64,
+		houseNumber, apartmentNumber string,
+	) (*FullAddress, error)
 }
 
 type CRUDGeo struct {
@@ -33,7 +38,7 @@ type CRUDGeo struct {
 }
 
 func (s *CRUDGeo) SelectRegions(limit, offset int) ([]Region, error) {
-	query := `SELECT * FROM geo.regions ORDER BY created_at DESC LIMIT $1 OFFSET $2`
+	query := `SELECT id, name, lat, lon FROM geo.regions ORDER BY created_at DESC LIMIT $1 OFFSET $2`
 	rows, err := s.DataBase.DBPool.Query(context.Background(), query, limit, offset)
 	if err != nil {
 		s.Logger.Error("Failed to select regions: ", err)
@@ -55,7 +60,7 @@ func (s *CRUDGeo) InsertRegion(name string) (*uuid.UUID, error) {
 }
 
 func (s *CRUDGeo) SelectCitiesInRegion(regionId uuid.UUID, limit, offset int) ([]City, error) {
-	query := `SELECT * FROM geo.cities WHERE region_id = $1 ORDER BY created_at DESC LIMIT $2 OFFSET $3`
+	query := `SELECT id, region_id, name, lat, lon FROM geo.cities WHERE region_id = $1 ORDER BY created_at DESC LIMIT $2 OFFSET $3`
 	rows, err := s.DataBase.DBPool.Query(context.Background(), query, regionId, limit, offset)
 	if err != nil {
 		s.Logger.Error("Failed to select cities in region: ", err)
@@ -76,7 +81,7 @@ func (s *CRUDGeo) SelectCitiesInRegion(regionId uuid.UUID, limit, offset int) ([
 }
 
 func (s *CRUDGeo) SelectCities(limit, offset int) ([]City, error) {
-	query := `SELECT * FROM geo.cities ORDER BY created_at DESC LIMIT $1 OFFSET $2`
+	query := `SELECT id, region_id, name, lat, lon FROM geo.cities ORDER BY created_at DESC LIMIT $1 OFFSET $2`
 	rows, err := s.DataBase.DBPool.Query(context.Background(), query, limit, offset)
 	if err != nil {
 		s.Logger.Error("Failed to select cities: ", err)
@@ -98,7 +103,7 @@ func (s *CRUDGeo) InsertCity(regionId uuid.UUID, name string) (*uuid.UUID, error
 }
 
 func (s *CRUDGeo) SelectBuildingsInCity(cityId uuid.UUID, limit, offset int) ([]Building, error) {
-	query := `SELECT * FROM geo.buildings WHERE city_id = $1 ORDER BY created_at DESC LIMIT $2 OFFSET $3`
+	query := `SELECT id, city_id, street, additional, house_number, lat, lon FROM geo.buildings WHERE city_id = $1 ORDER BY created_at DESC LIMIT $2 OFFSET $3`
 	rows, err := s.DataBase.DBPool.Query(context.Background(), query, cityId, limit, offset)
 	if err != nil {
 		s.Logger.Error("Failed to select buildings in city: ", err)
@@ -119,7 +124,7 @@ func (s *CRUDGeo) SelectBuildingsInCity(cityId uuid.UUID, limit, offset int) ([]
 }
 
 func (s *CRUDGeo) SelectBuildings(limit, offset int) ([]Building, error) {
-	query := `SELECT * FROM geo.buildings ORDER BY created_at DESC LIMIT $1 OFFSET $2`
+	query := `SELECT id, city_id, street, additional, house_number, lat, lon FROM geo.buildings ORDER BY created_at DESC LIMIT $1 OFFSET $2`
 	rows, err := s.DataBase.DBPool.Query(context.Background(), query, limit, offset)
 	if err != nil {
 		s.Logger.Error("Failed to select buildings: ", err)
@@ -141,7 +146,7 @@ func (s *CRUDGeo) InsertBuilding(cityId uuid.UUID, street, houseNumber string) (
 }
 
 func (s *CRUDGeo) SelectAddressesInBuilding(buildingId uuid.UUID, limit, offset int) ([]Address, error) {
-	query := `SELECT * FROM geo.addresses WHERE building_id = $1 ORDER BY created_at DESC LIMIT $2 OFFSET $3`
+	query := `SELECT id, building_id, apartment_number FROM geo.addresses WHERE building_id = $1 ORDER BY created_at DESC LIMIT $2 OFFSET $3`
 	rows, err := s.DataBase.DBPool.Query(context.Background(), query, buildingId, limit, offset)
 	if err != nil {
 		s.Logger.Error("Failed to select addresses in building: ", err)
@@ -161,7 +166,12 @@ func (s *CRUDGeo) SelectAddressesInBuilding(buildingId uuid.UUID, limit, offset 
 	return addresses, nil
 }
 
-func (s *CRUDGeo) InsertFullAddress(regionName, cityName, street, houseNumber, apartmentNumber string) (*FullAddress, error) {
+func (s *CRUDGeo) InsertFullAddress(
+	regionName string, regionLat float64, regionLon float64,
+	cityName string, cityLat float64, cityLon float64,
+	street string, additional *string, streetLat float64, streetLon float64,
+	houseNumber, apartmentNumber string,
+) (*FullAddress, error) {
 	ctx := context.Background()
 	tx, err := s.DataBase.DBPool.Begin(ctx)
 	if err != nil {
@@ -171,13 +181,13 @@ func (s *CRUDGeo) InsertFullAddress(regionName, cityName, street, houseNumber, a
 	defer tx.Rollback(ctx)
 
 	regionQuery := `
-		INSERT INTO geo.regions (name)
-		VALUES ($1)
+		INSERT INTO geo.regions (name, lat, lon)
+		VALUES ($1, $2, $3)
 		ON CONFLICT (name) DO NOTHING
-		RETURNING *`
-	row, err := tx.Query(ctx, regionQuery, regionName)
+		RETURNING id, name, lat, lon`
+	row, err := tx.Query(ctx, regionQuery, regionName, regionLat, regionLon)
 	if err != nil {
-		s.Logger.Error("Failed to insert/get region: ", err)
+		s.Logger.Error("Failed to insert/select region: ", err)
 		return nil, err
 	}
 	defer row.Close()
@@ -189,13 +199,13 @@ func (s *CRUDGeo) InsertFullAddress(regionName, cityName, street, houseNumber, a
 	}
 
 	cityQuery := `
-		INSERT INTO geo.cities (name, region_id)
-		VALUES ($1, $2)
+		INSERT INTO geo.cities (name, region_id, lat, lon)
+		VALUES ($1, $2, $3, $4)
 		ON CONFLICT (name) DO NOTHING
-		RETURNING *`
-	row, err = tx.Query(ctx, cityQuery, cityName, region.ID)
+		RETURNING id, region_id, name, lat, lon`
+	row, err = tx.Query(ctx, cityQuery, cityName, region.ID, cityLat, cityLon)
 	if err != nil {
-		s.Logger.Error("Failed to insert/get city: ", err)
+		s.Logger.Error("Failed to insert/select city: ", err)
 		return nil, err
 	}
 	defer row.Close()
@@ -207,13 +217,12 @@ func (s *CRUDGeo) InsertFullAddress(regionName, cityName, street, houseNumber, a
 	}
 
 	buildingQuery := `
-		INSERT INTO geo.buildings (city_id, street, house_number)
-		VALUES ($1, $2, $3)
-		ON CONFLICT (city_id, street, house_number) DO NOTHING
-		RETURNING *`
-	row, err = tx.Query(ctx, buildingQuery, city.ID, street, houseNumber)
+		INSERT INTO geo.buildings (city_id, street, additional, house_number, lat, lon)
+		VALUES ($1, $2, $3, $4, $5, $6)
+		RETURNING id, city_id, street, additional, house_number, lat, lon`
+	row, err = tx.Query(ctx, buildingQuery, city.ID, street, additional, houseNumber, streetLat, streetLon)
 	if err != nil {
-		s.Logger.Error("Failed to insert/get building: ", err)
+		s.Logger.Error("Failed to insert/select building: ", err)
 		return nil, err
 	}
 	defer row.Close()
@@ -228,10 +237,10 @@ func (s *CRUDGeo) InsertFullAddress(regionName, cityName, street, houseNumber, a
 		INSERT INTO geo.addresses (building_id, apartment_number)
 		VALUES ($1, $2)
 		ON CONFLICT (building_id, apartment_number) DO NOTHING
-		RETURNING *`
+		RETURNING id, building_id, apartment_number`
 	row, err = tx.Query(ctx, addressQuery, building.ID, apartmentNumber)
 	if err != nil {
-		s.Logger.Error("Failed to insert/get address: ", err)
+		s.Logger.Error("Failed to insert/select address: ", err)
 		return nil, err
 	}
 	defer row.Close()
@@ -255,10 +264,16 @@ func (s *CRUDGeo) InsertFullAddress(regionName, cityName, street, houseNumber, a
 	return &FullAddress{
 		RegionID:        region.ID,
 		Region:          region.Name,
+		RegionLat:       region.Lat,
+		RegionLon:       region.Lon,
 		CityID:          city.ID,
 		City:            city.Name,
+		CityLat:         city.Lat,
+		CityLon:         city.Lon,
 		BuildingID:      building.ID,
 		Street:          building.Street,
+		StreetLat:       building.Lat,
+		StreetLon:       building.Lon,
 		HouseNumber:     building.HouseNumber,
 		AddressID:       address.ID,
 		ApartmentNumber: address.ApartmentNumber,

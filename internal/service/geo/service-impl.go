@@ -79,8 +79,18 @@ func (s *Service) GetAddressesInBuilding(buildingId uuid.UUID, limit, offset int
 	return s.CRUDGeo.SelectAddressesInBuilding(buildingId, limit, offset)
 }
 
-func (s *Service) AddFullAddress(regionName, cityName, street, houseNumber, apartmentNumber string) (*FullAddress, error) {
-	return s.CRUDGeo.InsertFullAddress(regionName, cityName, street, houseNumber, apartmentNumber)
+func (s *Service) AddFullAddress(
+	regionName string, regionLat float64, regionLon float64,
+	cityName string, cityLat float64, cityLon float64,
+	street string, additional *string, streetLat float64, streetLon float64,
+	houseNumber, apartmentNumber string,
+) (*FullAddress, error) {
+	return s.CRUDGeo.InsertFullAddress(
+		regionName, regionLat, regionLon,
+		cityName, cityLat, cityLon,
+		street, additional, streetLat, streetLon,
+		houseNumber, apartmentNumber,
+	)
 }
 
 func NewService(cfg *config.Config, db *database.DataBase, logger *logrus.Logger, ddsApi *suggest.Api) *Service {

@@ -34,11 +34,11 @@ func NewGeoHandler(cfg *config.Config, geoService *geo.Service) *Handlers {
 
 	handlers.Router.With(middleware.AuthorizationMiddleware()).Post("/suggestions", handlers.PostAddressSuggestionsHandler())
 
-	handlers.Router.With(middleware.AuthorizationMiddleware()).Get("/regions", handlers.GetRegionsHandler())
-	handlers.Router.With(middleware.AuthorizationMiddleware()).Get("/regions/{region-id}/cities", handlers.GetCitiesInRegionHandler())
+	handlers.Router.With().Get("/regions", handlers.GetRegionsHandler())
+	handlers.Router.With().Get("/regions/{region-id}/cities", handlers.GetCitiesInRegionHandler())
 
-	handlers.Router.With(middleware.AuthorizationMiddleware()).Get("/cities", handlers.GetCitiesHandler())
-	handlers.Router.With(middleware.AuthorizationMiddleware()).Get("/cities/{city-id}/buildings", handlers.GetBuildingsInCityHandler())
+	handlers.Router.With().Get("/cities", handlers.GetCitiesHandler())
+	handlers.Router.With().Get("/cities/{city-id}/buildings", handlers.GetBuildingsInCityHandler())
 
 	handlers.Router.With(middleware.AuthorizationMiddleware()).Get("/buildings", handlers.GetBuildingsHandler())
 	handlers.Router.With(middleware.AuthorizationMiddleware()).Get("/buildings/{building-id}/addresses", handlers.GetAddressesInBuildingHandler())
