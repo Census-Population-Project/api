@@ -47,7 +47,9 @@ func (s *CRUDUsers) CreateUser(
 	defer tx.Rollback(context.Background())
 
 	query := `INSERT INTO auth.users (email, first_name, last_name, role, default_user)
-	VALUES ($1, $2, $3, $4, $5) RETURNING id, email, first_name, last_name, role, default_user`
+	VALUES ($1, $2, $3, $4, $5)
+	RETURNING id, email, first_name, last_name, role, default_user
+	`
 	row, err := tx.Query(context.Background(), query, email, firstName, lastName, role, defaultUser)
 	if err != nil {
 		s.Logger.Error("Failed to create user: ", err)

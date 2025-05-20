@@ -36,6 +36,8 @@ func NewCensusHandler(cfg *config.Config, censusService *census.Service, geoServ
 
 	handlers.Router.Get("/events", handlers.GetEventsHandler())
 	handlers.Router.Get("/events/{event-id}", handlers.GetEventInfoHandler())
+	handlers.Router.Get("/events/{event-id}/region/{region-id}", handlers.GetEventDataInRegionHandler())
+	handlers.Router.Get("/events/{event-id}/city/{city-id}", handlers.GetEventDataInCityHandler())
 
 	return handlers
 }
@@ -87,6 +89,90 @@ func (h *Handlers) GetEventInfoHandler() http.HandlerFunc {
 		}
 
 		eventData, err := h.CensusService.GetEventInfoByID(eventId)
+		if err != nil {
+			var srvErr serviceerrors.ServiceError
+			if errors.As(err, &srvErr) {
+				tools.RespondWithError(w, srvErr.ErrorStatusCode(), err.Error())
+			} else {
+				tools.RespondWithError(w, http.StatusInternalServerError, "Service error, sorry")
+			}
+			return
+		}
+
+		tools.RespondWithJSON(w, http.StatusOK, response.SuccessResponseWithResult{
+			Status: "success",
+			Result: eventData,
+		})
+	}
+}
+
+func (h *Handlers) GetEventDataInRegionHandler() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		eventIdStr := chi.URLParam(r, "event-id")
+		if eventIdStr == "" {
+			tools.RespondWithError(w, http.StatusBadRequest, "Event id is required")
+			return
+		}
+
+		eventId, err := uuid.Parse(eventIdStr)
+		if err != nil {
+			tools.RespondWithError(w, http.StatusBadRequest, "Invalid event id")
+			return
+		}
+
+		var regionId *uuid.UUID
+		if regionIdStr := chi.URLParam(r, "region-id"); regionIdStr != "" {
+			id, err := uuid.Parse(regionIdStr)
+			if err != nil {
+				tools.RespondWithError(w, http.StatusBadRequest, "Invalid region id")
+				return
+			}
+			regionId = &id
+		}
+
+		eventData, err := h.CensusService.GetEventInfoByLocationIDs(eventId, regionId, nil)
+		if err != nil {
+			var srvErr serviceerrors.ServiceError
+			if errors.As(err, &srvErr) {
+				tools.RespondWithError(w, srvErr.ErrorStatusCode(), err.Error())
+			} else {
+				tools.RespondWithError(w, http.StatusInternalServerError, "Service error, sorry")
+			}
+			return
+		}
+
+		tools.RespondWithJSON(w, http.StatusOK, response.SuccessResponseWithResult{
+			Status: "success",
+			Result: eventData,
+		})
+	}
+}
+
+func (h *Handlers) GetEventDataInCityHandler() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		eventIdStr := chi.URLParam(r, "event-id")
+		if eventIdStr == "" {
+			tools.RespondWithError(w, http.StatusBadRequest, "Event id is required")
+			return
+		}
+
+		eventId, err := uuid.Parse(eventIdStr)
+		if err != nil {
+			tools.RespondWithError(w, http.StatusBadRequest, "Invalid event id")
+			return
+		}
+
+		var cityId *uuid.UUID
+		if cityIdStr := chi.URLParam(r, "city-id"); cityIdStr != "" {
+			id, err := uuid.Parse(cityIdStr)
+			if err != nil {
+				tools.RespondWithError(w, http.StatusBadRequest, "Invalid city id")
+				return
+			}
+			cityId = &id
+		}
+
+		eventData, err := h.CensusService.GetEventInfoByLocationIDs(eventId, nil, cityId)
 		if err != nil {
 			var srvErr serviceerrors.ServiceError
 			if errors.As(err, &srvErr) {

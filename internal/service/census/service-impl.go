@@ -28,8 +28,8 @@ func (s *Service) GetEventInfoByID(id uuid.UUID) (*EventInfo, error) {
 	return s.CRUDCensus.SelectEventInfoByID(id)
 }
 
-func (s *Service) GetEventInfoByLocationIDs(regionId uuid.UUID, cityId uuid.UUID) (*EventInfo, error) {
-	return nil, nil
+func (s *Service) GetEventInfoByLocationIDs(id uuid.UUID, regionId *uuid.UUID, cityId *uuid.UUID) (*EventDataInLocation, error) {
+	return s.CRUDCensus.SelectEventInfoInLocationIDs(id, regionId, cityId)
 }
 
 func NewService(cfg *config.Config, db *database.DataBase, logger *logrus.Logger, ddsApi *suggest.Api) *Service {

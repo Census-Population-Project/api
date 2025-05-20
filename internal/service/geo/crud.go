@@ -180,11 +180,10 @@ func (s *CRUDGeo) InsertFullAddress(
 	}
 	defer tx.Rollback(ctx)
 
-	regionQuery := `
-		INSERT INTO geo.regions (name, lat, lon)
-		VALUES ($1, $2, $3)
-		ON CONFLICT (name) DO NOTHING
-		RETURNING id, name, lat, lon`
+	regionQuery := `INSERT INTO geo.regions (name, lat, lon)
+	VALUES ($1, $2, $3)
+	ON CONFLICT (name) DO NOTHING
+	RETURNING id, name, lat, lon`
 	row, err := tx.Query(ctx, regionQuery, regionName, regionLat, regionLon)
 	if err != nil {
 		s.Logger.Error("Failed to insert/select region: ", err)
@@ -198,11 +197,10 @@ func (s *CRUDGeo) InsertFullAddress(
 		return nil, err
 	}
 
-	cityQuery := `
-		INSERT INTO geo.cities (name, region_id, lat, lon)
-		VALUES ($1, $2, $3, $4)
-		ON CONFLICT (name) DO NOTHING
-		RETURNING id, region_id, name, lat, lon`
+	cityQuery := `INSERT INTO geo.cities (name, region_id, lat, lon)
+	VALUES ($1, $2, $3, $4)
+	ON CONFLICT (name) DO NOTHING
+	RETURNING id, region_id, name, lat, lon`
 	row, err = tx.Query(ctx, cityQuery, cityName, region.ID, cityLat, cityLon)
 	if err != nil {
 		s.Logger.Error("Failed to insert/select city: ", err)
@@ -216,10 +214,9 @@ func (s *CRUDGeo) InsertFullAddress(
 		return nil, err
 	}
 
-	buildingQuery := `
-		INSERT INTO geo.buildings (city_id, street, additional, house_number, lat, lon)
-		VALUES ($1, $2, $3, $4, $5, $6)
-		RETURNING id, city_id, street, additional, house_number, lat, lon`
+	buildingQuery := `INSERT INTO geo.buildings (city_id, street, additional, house_number, lat, lon)
+	VALUES ($1, $2, $3, $4, $5, $6)
+	RETURNING id, city_id, street, additional, house_number, lat, lon`
 	row, err = tx.Query(ctx, buildingQuery, city.ID, street, additional, houseNumber, streetLat, streetLon)
 	if err != nil {
 		s.Logger.Error("Failed to insert/select building: ", err)
@@ -233,11 +230,10 @@ func (s *CRUDGeo) InsertFullAddress(
 		return nil, err
 	}
 
-	addressQuery := `
-		INSERT INTO geo.addresses (building_id, apartment_number)
-		VALUES ($1, $2)
-		ON CONFLICT (building_id, apartment_number) DO NOTHING
-		RETURNING id, building_id, apartment_number`
+	addressQuery := `INSERT INTO geo.addresses (building_id, apartment_number)
+	VALUES ($1, $2)
+	ON CONFLICT (building_id, apartment_number) DO NOTHING
+	RETURNING id, building_id, apartment_number`
 	row, err = tx.Query(ctx, addressQuery, building.ID, apartmentNumber)
 	if err != nil {
 		s.Logger.Error("Failed to insert/select address: ", err)
