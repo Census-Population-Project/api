@@ -28,6 +28,8 @@ services:
 
   api:
     image: ghcr.io/census-population-project/api:0.1.0
+    ports:
+      - "38472:3000"
     volumes:
       - ./private.key:/app/private.key:ro
       - ./public.key:/app/public.key:ro
