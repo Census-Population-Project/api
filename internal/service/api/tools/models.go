@@ -26,13 +26,3 @@ const (
 	TimeWithTimeZone    TimeFormat = "15:04:05-07:00"
 	TimeWithoutTimeZone TimeFormat = "15:04:05"
 )
-
-type Pagination struct {
-	Next       string `json:"next"`
-	Prev       string `json:"prev"`
-	Count      int    `json:"count"`
-	Current    int    `json:"current"`
-	TotalPages int    `json:"total_pages"`
-	StartIndex int    `json:"start_index"`
-	EndIndex   int    `json:"end_index"`
-}

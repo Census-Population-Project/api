@@ -46,3 +46,8 @@ type EventDataInLocation struct {
 	PopulationCount int       `json:"population" db:"population"`
 	Genders         []Gender  `json:"genders" db:"genders"`
 }
+
+type Events struct {
+	Events []Event `json:"events"`
+	Total  int64   `json:"total"`
+}

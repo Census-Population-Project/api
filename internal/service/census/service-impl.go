@@ -20,7 +20,7 @@ type Service struct {
 	CRUDCensus *CRUDCensus
 }
 
-func (s *Service) GetEvents(limit, offset int) ([]Event, error) {
+func (s *Service) GetEvents(limit, offset int) ([]Event, *int64, error) {
 	return s.CRUDCensus.SelectEvents(limit, offset)
 }
 

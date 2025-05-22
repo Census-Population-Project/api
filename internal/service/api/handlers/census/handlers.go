@@ -56,7 +56,7 @@ func (h *Handlers) GetEventsHandler() http.HandlerFunc {
 			return
 		}
 
-		regionsData, err := h.CensusService.GetEvents(*limit, *offset)
+		regionsData, regionsCount, err := h.CensusService.GetEvents(*limit, *offset)
 		if err != nil {
 			var srvErr serviceerrors.ServiceError
 			if errors.As(err, &srvErr) {
@@ -69,7 +69,10 @@ func (h *Handlers) GetEventsHandler() http.HandlerFunc {
 
 		tools.RespondWithJSON(w, http.StatusOK, response.SuccessResponseWithResult{
 			Status: "success",
-			Result: regionsData,
+			Result: census.Events{
+				Events: regionsData,
+				Total:  *regionsCount,
+			},
 		})
 	}
 }

@@ -11,7 +11,7 @@ import (
 )
 
 type CRUDInterface interface {
-	SelectEvents(limit, offset int) ([]Event, error)
+	SelectEvents(limit, offset int) ([]Event, *int64, error)
 	SelectEventInfoByID(id uuid.UUID) (*EventInfo, error)
 	SelectEventInfoInLocationIDs(id uuid.UUID, regionId *uuid.UUID, cityId *uuid.UUID) (*EventInfo, error)
 }
@@ -21,22 +21,30 @@ type CRUDCensus struct {
 	Logger   *logrus.Logger
 }
 
-func (c *CRUDCensus) SelectEvents(limit, offset int) ([]Event, error) {
+func (c *CRUDCensus) SelectEvents(limit, offset int) ([]Event, *int64, error) {
 	query := `SELECT id, name, start_datetime, end_datetime FROM census.events ORDER BY start_datetime ASC LIMIT $1 OFFSET $2`
 	rows, err := c.DataBase.DBPool.Query(context.Background(), query, limit, offset)
 	if err != nil {
 		c.Logger.Error("Error selecting events: ", err)
-		return nil, err
+		return nil, nil, err
 	}
 	defer rows.Close()
 
 	events, err := pgx.CollectRows(rows, pgx.RowToStructByName[Event])
 	if err != nil {
 		c.Logger.Error("Error collecting events: ", err)
-		return nil, err
+		return nil, nil, err
 	}
 
-	return events, nil
+	var total *int64
+	query = `SELECT COUNT(*) FROM census.events`
+	row := c.DataBase.DBPool.QueryRow(context.Background(), query)
+	if err := row.Scan(&total); err != nil {
+		c.Logger.Error("Error counting events: ", err)
+		return nil, nil, err
+	}
+
+	return events, total, nil
 }
 
 func (c *CRUDCensus) SelectEventInfoByID(id uuid.UUID) (*EventInfo, error) {
