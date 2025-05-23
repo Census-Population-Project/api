@@ -13,7 +13,8 @@ import (
 type CRUDInterface interface {
 	SelectEvents(limit, offset int) ([]Event, *int64, error)
 	SelectEventInfoByID(id uuid.UUID) (*EventInfo, error)
-	SelectEventInfoInLocationIDs(id uuid.UUID, regionId *uuid.UUID, cityId *uuid.UUID) (*EventInfo, error)
+	SelectEventInfoInLocationIDs(id uuid.UUID, regionId *uuid.UUID, cityId *uuid.UUID) (*EventDataInLocation, error)
+	SelectEventStatisticsInLocationIDs(id uuid.UUID, regionId *uuid.UUID, cityId *uuid.UUID) (*EventStatistics, error)
 }
 
 type CRUDCensus struct {
@@ -81,7 +82,7 @@ func (c *CRUDCensus) SelectEventInfoByID(id uuid.UUID) (*EventInfo, error) {
 		   e.end_datetime,
 		   COUNT(DISTINCT pf.region_id)                                         AS regions_count,
 		   COUNT(DISTINCT pf.city_id)                                           AS cities_count,
-		   COUNT(pf.id)                                                         AS population,
+		   COUNT(pf.id)                                                         AS population_count,
 		   COALESCE((SELECT json_agg(row_to_json(g)) FROM genders_agg g), '[]') AS genders,
 		   COALESCE((SELECT json_agg(row_to_json(r)) FROM regions_agg r), '[]') AS regions,
 		   COALESCE((SELECT json_agg(row_to_json(c)) FROM cities_agg c), '[]')  AS cities
@@ -130,7 +131,7 @@ func (c *CRUDCensus) SelectEventInfoInLocationIDs(id uuid.UUID, regionId *uuid.U
 		   e.name,
 		   e.start_datetime,
 		   e.end_datetime,
-		   COUNT(pf.id)                                                         AS population,
+		   COUNT(pf.id)                                                         AS population_count,
 		   COALESCE((SELECT json_agg(row_to_json(g)) FROM genders_agg g), '[]') AS genders
 	FROM census.events e
 			 LEFT JOIN persons_filtered pf ON pf.event_id = e.id
@@ -151,6 +152,106 @@ func (c *CRUDCensus) SelectEventInfoInLocationIDs(id uuid.UUID, regionId *uuid.U
 	}
 
 	return &event, nil
+}
+
+func (c *CRUDCensus) SelectEventStatisticsInLocationIDs(id uuid.UUID, regionId *uuid.UUID, cityId *uuid.UUID) (*EventStatistics, error) {
+	query := `WITH filtered_addresses AS (SELECT a.id AS address_id
+								FROM geo.addresses a
+										 JOIN geo.buildings b ON a.building_id = b.id
+										 JOIN geo.cities c ON b.city_id = c.id
+										 JOIN geo.regions r ON c.region_id = r.id
+								WHERE ($2::uuid IS NULL OR c.id = $2)
+								  AND ($3::uuid IS NULL OR r.id = $3)),
+	
+		 filtered_households AS (SELECT h.*
+								 FROM census.households h
+								 WHERE h.event_id = $1
+								   AND h.address_id IN (SELECT address_id FROM filtered_addresses)),
+	
+		 filtered_persons AS (SELECT p.*
+							  FROM census.persons p
+									   JOIN filtered_households h ON p.household_id = h.id),
+	
+		 age_data AS (SELECT id,
+							 EXTRACT(YEAR FROM AGE(current_date, birth_date))::int AS age
+					  FROM filtered_persons),
+	
+		 genders_agg AS (SELECT p.gender::text AS type, COUNT(*) AS count
+						 FROM filtered_persons p
+						 GROUP BY p.gender),
+	
+		 education_agg AS (SELECT education_level, COUNT(*) AS edu_count
+						   FROM filtered_persons
+						   GROUP BY education_level),
+	
+		 employment_agg AS (SELECT employment_status, COUNT(*) AS emp_count
+							FROM filtered_persons
+							GROUP BY employment_status)
+	
+	SELECT
+		-- General statistics
+		(SELECT COUNT(*) FROM filtered_persons)                                    AS total_population,
+		(SELECT COUNT(*) FROM filtered_households)                                 AS total_households,
+		COALESCE(ROUND(
+						 COALESCE((SELECT COUNT(*) FROM filtered_persons), 0)::NUMERIC /
+						 NULLIF((SELECT COUNT(*) FROM filtered_households), 0), 2
+				 ), 0)                                                             AS avg_persons_per_household,
+	
+		-- Population structure
+		COALESCE((SELECT json_agg(row_to_json(g)) FROM genders_agg g), '[]'::json) AS gender_distribution,
+		COALESCE(ROUND(AVG(age_data.age), 1), 0)                                   AS average_age,
+		COUNT(*) FILTER (WHERE age_data.age < 18)                                  AS children_count,
+		COUNT(*) FILTER (WHERE age_data.age >= 65)                                 AS elderly_count,
+	
+		-- Education and employment
+		COALESCE((SELECT jsonb_object_agg(education_level, edu_count)
+				  FROM education_agg
+				  WHERE education_level IS NOT NULL), '{}'::jsonb)                 AS education_distribution,
+	
+		COALESCE((SELECT jsonb_object_agg(employment_status, emp_count)
+				  FROM employment_agg
+				  WHERE employment_status IS NOT NULL), '{}'::jsonb)               AS employment_distribution,
+	
+		-- Language and citizenship
+		COALESCE(ROUND(
+						 100.0 * COUNT(*) FILTER (WHERE speaks_russian) / NULLIF(COUNT(*), 0),
+						 2
+				 ), 0)                                                             AS percent_speaks_russian,
+	
+		COUNT(*) FILTER (WHERE has_dual_citizenship = true)                        AS dual_citizenship_count,
+	
+		COALESCE((SELECT jsonb_agg(t)
+				  FROM (SELECT lang AS type, COUNT(*) AS count
+						FROM (SELECT unnest(other_languages) AS lang
+							  FROM filtered_persons) AS langs
+						GROUP BY lang
+						ORDER BY count DESC
+						LIMIT 5) t), '[]'::jsonb)                                  AS top_other_languages,
+	
+		-- Income sources
+		COALESCE((SELECT jsonb_object_agg(source, count)
+				  FROM (SELECT income_source AS source, COUNT(*) AS count
+						FROM (SELECT unnest(income_sources) AS income_source
+							  FROM filtered_persons) sub
+						GROUP BY income_source) sub2), '{}'::jsonb)                AS income_sources_distribution
+	
+	FROM filtered_persons
+			 JOIN age_data ON age_data.id = filtered_persons.id`
+
+	row, err := c.DataBase.DBPool.Query(context.Background(), query, id, cityId, regionId)
+	if err != nil {
+		c.Logger.Error("Failed to select event statistics in location IDs: ", err)
+		return nil, err
+	}
+	defer row.Close()
+
+	eventStatistics, err := pgx.CollectOneRow(row, pgx.RowToStructByName[EventStatistics])
+	if err != nil {
+		c.Logger.Error("Failed to collect event statistics in location IDs: ", err)
+		return nil, err
+	}
+
+	return &eventStatistics, nil
 }
 
 func NewCensusCRUD(db *database.DataBase, log *logrus.Logger) *CRUDCensus {

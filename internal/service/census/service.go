@@ -6,4 +6,6 @@ type ServiceInterface interface {
 	GetEvents(limit, offset int) ([]Event, *int64, error)
 	GetEventInfoByID(id uuid.UUID) (*EventInfo, error)
 	GetEventInfoByLocationIDs(id uuid.UUID, regionId *uuid.UUID, cityId *uuid.UUID) (*EventDataInLocation, error)
+
+	GetEventStatisticsByLocationIDs(id uuid.UUID, regionId *uuid.UUID, cityId *uuid.UUID) (*EventStatistics, error)
 }
