@@ -23,6 +23,18 @@ type Language struct {
 	Count int    `json:"count"`
 }
 
+type RegionStatistics struct {
+	ID              uuid.UUID `json:"id" db:"id"`
+	Name            string    `json:"name" db:"name"`
+	PopulationCount int       `json:"population_count" db:"population_count"`
+}
+
+type CityStatistics struct {
+	ID              uuid.UUID `json:"id" db:"id"`
+	Name            string    `json:"name" db:"name"`
+	PopulationCount int       `json:"population_count" db:"population_count"`
+}
+
 type Event struct {
 	ID            uuid.UUID `json:"id" db:"id"`
 	Name          string    `json:"name" db:"name"`
@@ -55,6 +67,33 @@ type EventDataInLocation struct {
 type Events struct {
 	Events []Event `json:"events"`
 	Total  int64   `json:"total"`
+}
+
+type EventStatisticsAll struct {
+	// General information
+	TotalPopulation        int     `json:"total_population"`
+	TotalHouseholds        int     `json:"total_households"`
+	AvgPersonsPerHousehold float64 `json:"avg_persons_per_household"`
+
+	// Population structure
+	GenderDistribution []Gender `json:"gender_distribution"`
+	AverageAge         float64  `json:"average_age"`
+	ChildrenCount      int      `json:"children_count"`
+	ElderlyCount       int      `json:"elderly_count"`
+
+	// Education and employment
+	EducationDistribution  map[string]int `json:"education_distribution"`
+	EmploymentDistribution map[string]int `json:"employment_distribution"`
+
+	// Languages and citizenship
+	PercentSpeaksRussian float64    `json:"percent_speaks_russian"`
+	DualCitizenshipCount int        `json:"dual_citizenship_count"`
+	TopOtherLanguages    []Language `json:"top_other_languages"`
+
+	IncomeSourcesDistribution map[string]int `json:"income_sources_distribution"`
+
+	RegionsStatistics []RegionStatistics `json:"regions_statistics"`
+	CitiesStatistics  []CityStatistics   `json:"cities_statistics"`
 }
 
 type EventStatistics struct {

@@ -32,6 +32,10 @@ func (s *Service) GetEventInfoByLocationIDs(id uuid.UUID, regionId *uuid.UUID, c
 	return s.CRUDCensus.SelectEventInfoInLocationIDs(id, regionId, cityId)
 }
 
+func (s *Service) GetEventStatisticsAllByID(id uuid.UUID) (*EventStatisticsAll, error) {
+	return s.CRUDCensus.SelectEventStatisticsAllByID(id)
+}
+
 func (s *Service) GetEventStatisticsByLocationIDs(id uuid.UUID, regionId *uuid.UUID, cityId *uuid.UUID) (*EventStatistics, error) {
 	return s.CRUDCensus.SelectEventStatisticsInLocationIDs(id, regionId, cityId)
 }

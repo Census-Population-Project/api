@@ -36,6 +36,7 @@ func NewCensusHandler(cfg *config.Config, censusService *census.Service, geoServ
 
 	handlers.Router.Get("/events", handlers.GetEventsHandler())
 	handlers.Router.Get("/events/{event-id}", handlers.GetEventInfoHandler())
+	handlers.Router.Get("/events/{event-id}/statistics", handlers.GetEventStatisticsHandler())
 
 	handlers.Router.Get("/events/{event-id}/region/{region-id}", handlers.GetEventDataInRegionHandler())
 	handlers.Router.Get("/events/{event-id}/region/{region-id}/statistics", handlers.GetEventStatisticsInRegionHandler())
@@ -109,6 +110,38 @@ func (h *Handlers) GetEventInfoHandler() http.HandlerFunc {
 		tools.RespondWithJSON(w, http.StatusOK, response.SuccessResponseWithResult{
 			Status: "success",
 			Result: eventData,
+		})
+	}
+}
+
+func (h *Handlers) GetEventStatisticsHandler() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		eventIdStr := chi.URLParam(r, "event-id")
+		if eventIdStr == "" {
+			tools.RespondWithError(w, http.StatusBadRequest, "Event id is required")
+			return
+		}
+
+		eventId, err := uuid.Parse(eventIdStr)
+		if err != nil {
+			tools.RespondWithError(w, http.StatusBadRequest, "Invalid event id")
+			return
+		}
+
+		eventStatisticsAll, err := h.CensusService.GetEventStatisticsAllByID(eventId)
+		if err != nil {
+			var srvErr serviceerrors.ServiceError
+			if errors.As(err, &srvErr) {
+				tools.RespondWithError(w, srvErr.ErrorStatusCode(), err.Error())
+			} else {
+				tools.RespondWithError(w, http.StatusInternalServerError, "Service error, sorry")
+			}
+			return
+		}
+
+		tools.RespondWithJSON(w, http.StatusOK, response.SuccessResponseWithResult{
+			Status: "success",
+			Result: eventStatisticsAll,
 		})
 	}
 }
